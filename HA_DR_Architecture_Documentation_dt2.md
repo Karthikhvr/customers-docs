@@ -35,6 +35,7 @@ The SOAR Services platform implements an HA/DR strategy with two different synch
 - **Hot Sync (Oplog-based replication)**: Used for PRIMARY → SECONDARY synchronization within DC site and within DR site independently
 - Near real-time data synchronization (~1 minute lag)
 - Enables automatic failover within 20-35 minutes
+- SECONDARY performs continuous health checks. If the PRIMARY server does not respond within the configured time window, the secondary server automatically takes over. The default duration is 20 minutes.
 
 **Between Sites (Cross-Site DR):**
 - **DC–DR Incremental Backup & Restore**: Used ONLY for DC → DR cross-site synchronization
