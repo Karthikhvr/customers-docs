@@ -11,7 +11,7 @@ The Securaa solution implements a High Availability (HA) and Disaster Recovery (
 **Key Architecture Points:**
 - **Hot Sync (Oplog)**: Used ONLY within each site (DC Primary → DC Secondary; DR Primary → DR Secondary) for local HA
 - **Incremental Backup/Restore**: Used for cross-site synchronization (DC → DR) with 1-hour intervals (Configurable)
-- **RPO**: Data sync in ~1 minute within each site (Hot Sync); ~30 minutes between DC and DR (Incremental Backup)
+- **RPO**: Data sync in ~1 minute within each site (Hot Sync); ~1 hour (configurable) between DC and DR (Incremental Backup)
 
 ## Table of Contents
 
@@ -34,11 +34,11 @@ The SOAR Services platform implements an HA/DR strategy with two different synch
 **Within Each Site (Local HA):**
 - **Hot Sync (Oplog-based replication)**: Used for PRIMARY → SECONDARY synchronization within DC site and within DR site independently
 - Near real-time data synchronization (~1 minute lag)
-- Enables automatic failover within 15-35 seconds
+- Enables automatic failover within 20-35 minutes
 
 **Between Sites (Cross-Site DR):**
 - **DC–DR Incremental Backup & Restore**: Used ONLY for DC → DR cross-site synchronization
-- Automated cron-based periodic incremental backups (default: every 30 minutes)
+- Automated cron-based periodic incremental backups (default: every 1 hour)
 - Transferred via SCP (port 22)
 
 The architecture uses three-server MongoDB replica sets locally within each site (DC and DR operate independently) with Hot Sync for local HA, while cross-site DR relies on automated incremental backup/restore for DC → DR synchronization.
@@ -152,7 +152,7 @@ graph TB
     
     subgraph FAILOVER["<b>Failover Scenario</b>"]
         FAIL["<b>⚠ PRIMARY Server Failure</b>"]
-        ELECT["<b>Election Process</b><br/>Secondary + Arbiter Vote<br/>⏱ 15-35 seconds"]
+        ELECT["<b>Election Process</b><br/>Secondary + Arbiter Vote<br/>⏱ 20-35 minutes"]
         NEWPRIMARY["<b>✓ SECONDARY Promoted to Primary</b><br/>SOAR Standby → SOAR Active<br/>MongoDB Secondary → MongoDB Primary<br/>ALL Read/Write switch to New Primary"]
         
         FAIL --> ELECT
@@ -181,7 +181,7 @@ This section describes cross-site DC→DR synchronization (Incremental Backup & 
 ### DC–DR Incremental Backup & Restore (Cross-Site Only)
 
 Overview:
-- Automated periodic backups are taken at DC and automatically restored to DR at administrator-defined intervals. Default recommendation: every 30 minutes.
+- Automated periodic backups are taken at DC and automatically restored to DR at administrator-defined intervals. Default recommendation: every 1 hour.
 
 Process:
 1. Automated cron job performs MongoDB logical/physical and file backups at the DC (incremental dumps or snapshots).
@@ -190,10 +190,10 @@ Process:
 
 Behavior:
 - DR instance can remain active and continuously running (services can be available for testing).
-- Data on DR is updated on each automated restore based on administrator-defined intervals (≈ every 30 minutes recommended).
+- Data on DR is updated on each automated restore based on administrator-defined intervals (≈ every 1 hour recommended).
 - Initial downtime: the first restore to a new DR environment requires downtime on DR while the baseline restore completes — depends on production data size (typical order: ≈ 1 hour; varies).
-- Sync duration: ≈ 30 minutes per incremental cycle (depends on data volume and transfer frequency).
-- RPO is bounded by the backup interval (default 30 minutes recommendation).
+- Sync duration: ≈ 1 hour per incremental cycle (depends on data volume and transfer frequency).
+- RPO is bounded by the backup interval (default 1 hour recommendation).
 
 Notes and operational considerations:
 - Ensure sufficient DR storage and retention for incremental chains.
@@ -211,7 +211,7 @@ sequenceDiagram
     participant DR_DB as DR MongoDB
     participant DR_APP as DR Application
     
-    Note over DC_APP,DR_APP: Normal Operations (Automated backup every ~30 minutes)
+    Note over DC_APP,DR_APP: Normal Operations (Automated backup every ~1 hour)
     
     DC_APP->>DC_DB: Write Operations
     
@@ -253,12 +253,12 @@ sequenceDiagram
 **Within DC Site:**
 - DC PRIMARY automatically replicates oplog entries to DC SECONDARY over port 27017
 - Near real-time data synchronization (~1 minute lag)
-- Enables automatic failover: DC SECONDARY can become PRIMARY within 15-35 seconds
+- Enables automatic failover: DC SECONDARY can become PRIMARY within 20-35 minutes
 
 **Within DR Site:**
 - DR PRIMARY automatically replicates oplog entries to DR SECONDARY over port 27017  
 - Near real-time data synchronization (~1 minute lag)
-- Enables automatic failover: DR SECONDARY can become PRIMARY within 15-35 seconds
+- Enables automatic failover: DR SECONDARY can become PRIMARY within 20-35 minutes
 
 **NOT Used for Cross-Site:**
 - Hot Sync/oplog replication is NOT used between DC and DR sites
@@ -297,7 +297,7 @@ sequenceDiagram
     DC_SEC->>DC_ARB: Election vote request
     DC_ARB-->>DC_SEC: Vote granted
     
-    Note over DC_SEC: <b>⚡ Automatic Election</b><br/>Secondary → Primary<br/>(15-35 seconds)
+    Note over DC_SEC: <b>⚡ Automatic Election</b><br/>Secondary → Primary<br/>(20-35 minutes)
     
     DC_SEC->>DC_SEC: Promote to PRIMARY
     
@@ -377,7 +377,7 @@ flowchart TD
 **Within DC Site or DR Site:**
 - When PRIMARY fails, MongoDB replica set automatically initiates election
 - SECONDARY and Arbiter participate in voting
-- SECONDARY is promoted to PRIMARY automatically (15-35 seconds)
+- SECONDARY is promoted to PRIMARY automatically (20-35 minutes)
 - Application automatically reconnects to new PRIMARY
 - No manual intervention required
 
@@ -392,7 +392,7 @@ flowchart TD
 **Estimated timings:**
 - Election process: 10-15 seconds
 - Application reconnection: 5-20 seconds  
-- **Total Failover: 15-35 seconds end-to-end**
+- **Total Failover: 20-35 minutes end-to-end**
 - **No manual intervention required**
 
 #### Local HA Failover Flow (Within Site)
@@ -410,7 +410,7 @@ flowchart TD
     E --> F["✅ SECONDARY Promoted<br/>to PRIMARY"]
     F --> G["� Application Auto-Reconnects<br/>to New PRIMARY"]
     
-    G --> H["✅ <b>Operations Resumed</b><br/>15-35 seconds total"]
+    G --> H["✅ <b>Operations Resumed</b><br/>20-35 minutes total"]
     
     H --> I{"Original PRIMARY<br/>Recovered?"}
     I -->|"No"| J["Continue with<br/>New PRIMARY"]
@@ -486,7 +486,7 @@ flowchart TD
 **Failover Characteristics:**
 - **Detection Time**: 10-15 seconds (heartbeat timeout)
 - **Election Time**: 5-20 seconds (across servers within site, minimal latency)
-- **Total Failover**: 15-35 seconds end-to-end
+- **Total Failover**: 20-35 minutes end-to-end
 - **Application Impact**: Brief connection interruption, automatic reconnection
 - **Data Consistency**: Zero data loss with proper write concerns
 
@@ -502,14 +502,14 @@ We support two cross-site synchronization methods; the synchronization descripti
 - Archives compressed and transferred over SCP (port 22).
 - Transfer integrity validated (checksums).
 - Restore agent on DR applies increments to the DR MongoDB.
-- Default configurable interval: 30 minutes; can be tuned to smaller or larger windows depending on bandwidth and RPO needs.
-- Sync duration: ~30 minutes typical for incremental cycle (varies on data volume).
+- Default configurable interval: 1 hour; can be tuned to smaller or larger windows depending on bandwidth and RPO needs.
+- Sync duration: ~1 hour typical for incremental cycle (varies on data volume).
 
 #### Incremental Backup Data Flow
 
 ```mermaid
 graph LR
-    subgraph "DC Site - Every 30 Minutes"
+    subgraph "DC Site - Every 1 hour"
         A[SOAR Application<br/>Write Operations] --> B[DC MongoDB<br/>Primary]
         B --> C[Change Detection<br/>Agent]
         C --> D{Data Modified<br/>Since Last Backup?}
@@ -535,7 +535,7 @@ graph LR
         P --> Q[Apply Changes to<br/>DR MongoDB]
         Q --> R[Update System<br/>Metadata]
         R --> S[Log Sync<br/>Completion]
-        S --> T[DR Data Updated<br/>RPO: 30 minutes]
+        S --> T[DR Data Updated<br/>RPO: 1 hour]
     end
     
     style A fill:#90EE90
@@ -550,12 +550,12 @@ graph LR
 **Within DC Site:**
 - MongoDB oplog entries are streamed from DC PRIMARY to DC SECONDARY via port 27017
 - Near real-time replication within the site: typical lag ~1 minute
-- Enables automatic failover within 15-35 seconds
+- Enables automatic failover within 20-35 minutes
 
 **Within DR Site:**
 - MongoDB oplog entries are streamed from DR PRIMARY to DR SECONDARY via port 27017
 - Near real-time replication within the site: typical lag ~1 minute
-- Enables automatic failover within 15-35 seconds
+- Enables automatic failover within 20-35 minutes
 
 **Between Sites:**
 - DC and DR do NOT use oplog replication
@@ -586,7 +586,7 @@ graph TB
     end
     
     subgraph CROSS_SITE["<b>� Cross-Site DC → DR (Port 22 SCP)</b>"]
-        DC_BACKUP["📂 DC Incremental Backup<br/>Every 30 minutes"] --> SCP["� SCP Transfer<br/>Port 22"]
+        DC_BACKUP["📂 DC Incremental Backup<br/>Every 1 hour"] --> SCP["� SCP Transfer<br/>Port 22"]
         SCP --> DR_RESTORE["📂 DR Restore<br/>Automated"]
     end
     
@@ -688,12 +688,12 @@ Success criteria:
 
 The platform uses two different synchronization technologies:
 
-1. **Hot Sync (Oplog Replication)**: Used **ONLY within each site** (DC Primary → DC Secondary; DR Primary → DR Secondary) for local high availability. Provides near real-time replication (~1 minute lag) and enables automatic failover within 15-35 seconds.
+1. **Hot Sync (Oplog Replication)**: Used **ONLY within each site** (DC Primary → DC Secondary; DR Primary → DR Secondary) for local high availability. Provides near real-time replication (~1 minute lag) and enables automatic failover within 20-35 minutes.
 
-2. **DC–DR Incremental Backup & Restore**: Used **ONLY for cross-site synchronization** (DC → DR). Automated cron-based incremental backups (recommended: every 30 minutes) automatically transfer and restore to DR via SCP. Initial baseline setup may require ≈ 1 hour.
+2. **DC–DR Incremental Backup & Restore**: Used **ONLY for cross-site synchronization** (DC → DR). Automated cron-based incremental backups (recommended: every 1 hour) automatically transfer and restore to DR via SCP. Initial baseline setup may require ≈ 1 hour.
 
 **Key Architecture Points:**
-- **Local Site HA (Automatic)**: Each site (DC and DR) has 3-server MongoDB replica set (1 PRIMARY + 1 SECONDARY with data + 1 Arbiter without data) with automatic failover (15-35 seconds)
+- **Local Site HA (Automatic)**: Each site (DC and DR) has 3-server MongoDB replica set (1 PRIMARY + 1 SECONDARY with data + 1 Arbiter without data) with automatic failover (20-35 minutes)
 - **Hot Sync (Oplog Replication)**: Used ONLY within each site for PRIMARY → SECONDARY replication (~1 minute lag)
 - **Cross-Site DR (Incremental Backup)**: DC to DR synchronization uses automated cron-based incremental backups (30-minute intervals via SCP)
 - **2x Data Redundancy**: PRIMARY and SECONDARY store complete copies of data; Arbiter has no data
@@ -703,10 +703,10 @@ The platform uses two different synchronization technologies:
 ### Automation Summary: What's Automatic vs Manual
 
 **✅ AUTOMATIC (No Manual Intervention Required):**
-1. **Local HA Failover**: DC Primary ↔ DC Secondary switchover (15-35 seconds)
-2. **Local HA Failover**: DR Primary ↔ DR Secondary switchover (15-35 seconds)
+1. **Local HA Failover**: DC Primary ↔ DC Secondary switchover (20-35 minutes)
+2. **Local HA Failover**: DR Primary ↔ DR Secondary switchover (20-35 minutes)
 3. **Data Replication (Hot Sync)**: PRIMARY → SECONDARY within each site (continuous oplog replication, ~1 minute lag)
-4. **Cross-Site Data Sync**: DC → DR synchronization via automated cron jobs (Incremental Backup, every 30 minutes)
+4. **Cross-Site Data Sync**: DC → DR synchronization via automated cron jobs (Incremental Backup, every 1 hour)
 5. **Health Monitoring**: Heartbeat between PRIMARY, SECONDARY, and Arbiter within each site
 6. **Election Process**: Automatic Primary election when failure detected within each site
 
@@ -728,13 +728,13 @@ The platform uses two different synchronization technologies:
 | **Purpose** | Cross-site DR synchronization | Local HA within site |
 | **Scope** | DC site → DR site | DC Primary → DC Secondary<br/>DR Primary → DR Secondary |
 | **Synchronization Method** | Automated cron incremental backups via SCP | Continuous automated oplog replication |
-| **Default Interval** | 30 minutes recommended | Near real-time (~1 minute lag) |
+| **Default Interval** | 1 hour recommended | Near real-time (~1 minute lag) |
 | **Network Ports** | Port 22 (SSH/SCP) | Port 27017 (MongoDB) |
-| **RPO (Recovery Point Objective)** | 30 minutes (backup interval) | ~1 minute (replication lag) |
-| **RTO (Recovery Time Objective)** | Manual DR activation (5-15 min) | Automatic failover (15-35 seconds) |
+| **RPO (Recovery Point Objective)** | 1 hour (backup interval) | ~1 minute (replication lag) |
+| **RTO (Recovery Time Objective)** | Manual DR activation (5-15 min) | Automatic failover (20-35 minutes) |
 | **Activation** | Manual by administrator (cross-site) | Automatic (within site) |
 | **Initial Setup Time** | ~1 hour (baseline restore) | Immediate (replica set setup) |
-| **Data Loss on Failover** | Up to 30 minutes (cross-site) | Up to ~1 minute (within site) |
+| **Data Loss on Failover** | Up to 1 hour (cross-site) | Up to ~1 minute (within site) |
 | **Bandwidth Requirements** | Moderate (periodic transfers) | Higher (continuous streaming) |
 | **Complexity** | Simple (automated cron jobs) | Moderate (oplog management, monitoring) |
 | **Automation Level** | Automated sync + manual activation | Fully automatic |
@@ -752,8 +752,8 @@ flowchart TD
     A["🎯 <b>HA/DR Architecture</b>"] --> B["<b>Within Each Site (DC & DR)</b><br/>Hot Sync - Oplog Replication"]
     A --> C["<b>Between Sites (DC → DR)</b><br/>Incremental Backup & Restore"]
     
-    B --> D["✅ Automatic Failover<br/>15-35 seconds<br/>RPO: ~1 minute<br/>(LOCAL HA)"]
-    C --> E["✅ Automated Sync (30 min)<br/>⚠️ Manual DR Activation<br/>RPO: ~30 minutes<br/>(CROSS-SITE DR)"]
+    B --> D["✅ Automatic Failover<br/>20-35 minutes<br/>RPO: ~1 minute<br/>(LOCAL HA)"]
+    C --> E["✅ Automated Sync (30 min)<br/>⚠️ Manual DR Activation<br/>RPO: ~1 hour<br/>(CROSS-SITE DR)"]
     
     D --> F["<b>Combined Architecture</b><br/>Local HA (automatic) + Cross-Site DR (manual activation)"]
     E --> F
@@ -782,14 +782,14 @@ graph TB
     subgraph LHA["<b>🔄 LOCAL HA - Both DC & DR Sites (Hot Sync)</b>"]
         LHA1["<b>MongoDB Replica Set</b><br/>3 Servers (2 data + 1 arbiter)<br/>Port 27017"]
         LHA2["<b>Oplog Replication</b><br/>PRIMARY → SECONDARY<br/>~1 min lag"]
-        LHA3["<b>Auto Failover</b><br/>⏱ 15-35 seconds"]
+        LHA3["<b>Auto Failover</b><br/>⏱ 20-35 minutes"]
         LHA4["<b>2x Data Redundancy</b><br/>PRIMARY + SECONDARY (data)<br/>+ Arbiter (voting only)"]
         
         LHA1 --> LHA2 --> LHA3 --> LHA4
     end
     
     subgraph IB["<b>📦 CROSS-SITE DR: Incremental Backup & Restore (DC → DR)</b>"]
-        IB1["⏱ Every 30 Minutes<br/>(Automated Cron)"]
+        IB1["⏱ Every 1 hour<br/>(Automated Cron)"]
         IB2["🔒 SCP Transfer<br/>Port 22"]
         IB3["✅ DR Standby State<br/>(Data Synchronized)"]
         IB4["📊 RPO: 30 min"]
@@ -800,7 +800,7 @@ graph TB
     end
     
     subgraph FO["<b>🚨 FAILOVER TYPES</b>"]
-        FO1["<b>Within Site (Automatic)</b><br/>PRIMARY → SECONDARY<br/>15-35 seconds"]
+        FO1["<b>Within Site (Automatic)</b><br/>PRIMARY → SECONDARY<br/>20-35 minutes"]
         FO2["<b>Cross-Site (Manual)</b><br/>DC → DR Activation<br/>Admin intervention required"]
     end
     
@@ -892,7 +892,7 @@ Users → PRIMARY SOAR (HTTPS 443: 192.0.2.10) → [Active UI & Services]
 - **2x Data Redundancy**: 2 nodes store complete copies of data (PRIMARY + SECONDARY); Arbiter has no data
 - **Single Port Configuration**: All three replica set members use port 27017
 - **Single Point of Read/Write**: All operations always go to the current Primary node (never split between nodes)
-- **Automatic Failover**: SECONDARY can be automatically promoted when PRIMARY fails (15-35 seconds)
+- **Automatic Failover**: SECONDARY can be automatically promoted when PRIMARY fails (20-35 minutes)
 - **Data Redundancy**: 2 complete copies of data (PRIMARY + SECONDARY); Arbiter stores no data
 - **Election Quorum**: Requires majority vote (2 out of 3) to elect new Primary
 - **Zero Data Loss**: SECONDARY stays synchronized; no data loss on failover with proper write concerns
