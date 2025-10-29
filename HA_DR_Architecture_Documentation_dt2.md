@@ -234,7 +234,7 @@ sequenceDiagram
         CRON->>DR_APP: Update configurations if needed
     end
     
-    Note over DC_APP,DR_APP: DR is now synced (RPO = 30 min)
+    Note over DC_APP,DR_APP: DR is now synced (RPO = 1 hour)
     
     rect rgb(230, 200, 200)
         Note over DC_APP,DR_APP: DC Failure Scenario - Manual DR Activation
@@ -263,7 +263,7 @@ sequenceDiagram
 
 **NOT Used for Cross-Site:**
 - Hot Sync/oplog replication is NOT used between DC and DR sites
-- DC→DR synchronization uses Incremental Backup & Restore only (30-minute intervals)
+- DC→DR synchronization uses Incremental Backup & Restore only (1-hour intervals)
 
 Notes and operational considerations:
 - Hot Sync operates independently within each site for local high availability
@@ -696,7 +696,7 @@ The platform uses two different synchronization technologies:
 **Key Architecture Points:**
 - **Local Site HA (Automatic)**: Each site (DC and DR) has 3-server MongoDB replica set (1 PRIMARY + 1 SECONDARY with data + 1 Arbiter without data) with automatic failover (20-35 minutes)
 - **Hot Sync (Oplog Replication)**: Used ONLY within each site for PRIMARY → SECONDARY replication (~1 minute lag)
-- **Cross-Site DR (Incremental Backup)**: DC to DR synchronization uses automated cron-based incremental backups (30-minute intervals via SCP)
+- **Cross-Site DR (Incremental Backup)**: DC to DR synchronization uses automated cron-based incremental backups (1-hour intervals via SCP)
 - **2x Data Redundancy**: PRIMARY and SECONDARY store complete copies of data; Arbiter has no data
 - **No Automated Cross-Site Failover**: Automated backup synchronization runs continuously; DR activation is manual
 - **Identical Architecture**: DR site mirrors DC site structure (3 servers: 2 data-bearing + 1 arbiter)
@@ -754,7 +754,7 @@ flowchart TD
     A --> C["<b>Between Sites (DC → DR)</b><br/>Incremental Backup & Restore"]
     
     B --> D["✅ Automatic Failover<br/>20-35 minutes<br/>RPO: ~1 minute<br/>(LOCAL HA)"]
-    C --> E["✅ Automated Sync (30 min)<br/>⚠️ Manual DR Activation<br/>RPO: ~1 hour<br/>(CROSS-SITE DR)"]
+    C --> E["✅ Automated Sync (1 hour)<br/>⚠️ Manual DR Activation<br/>RPO: ~1 hour<br/>(CROSS-SITE DR)"]
     
     D --> F["<b>Combined Architecture</b><br/>Local HA (automatic) + Cross-Site DR (manual activation)"]
     E --> F
@@ -793,7 +793,7 @@ graph TB
         IB1["⏱ Every 1 hour<br/>(Automated Cron)"]
         IB2["🔒 SCP Transfer<br/>Port 22"]
         IB3["✅ DR Standby State<br/>(Data Synchronized)"]
-        IB4["📊 RPO: 30 min"]
+        IB4["📊 RPO: 1 hour"]
         IB5["⏱ RTO: 5-15 min<br/>(Manual Activation)"]
         
         IB1 --> IB2 --> IB3
