@@ -103,7 +103,7 @@ Key properties:
 - **PRIMARY Node (Port 27017)**: Runs SOAR Primary application + MongoDB Primary; handles all read and write operations; **automatically replicates data to Secondary**
 - **SECONDARY Node (Port 27017)**: Runs SOAR Secondary application + MongoDB Secondary; maintains a complete copy of data; **automatically participates in elections**; **automatically becomes Primary on failover**
 - **SECONDARY Node (Arbiter - Port 27017)**: Runs Arbiter service only (labeled as "SECONDARY" in diagrams); **automatically participates in elections**; **does NOT store data**; acts as tiebreaker
-- **Automatic election and failover within ~15–35 seconds** (no manual intervention required)
+- **Automatic election within ~15–35 seconds and failover within 20-35 minutes** (no manual intervention required)
 - **All operations (read + write) performed on Primary node only**
 - When the Secondary becomes Primary, all read/write operations **automatically switch** to the new Primary
 - **All three MongoDB instances use port 27017**
