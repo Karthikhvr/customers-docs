@@ -4,14 +4,14 @@
 
 The Securaa solution implements a High Availability (HA) and Disaster Recovery (DR) architecture designed to ensure business continuity, data protection, and recovery capabilities. 
 
-**Local Site HA (Fully Automatic):** Each site (DC and DR independently) operates a 3-server MongoDB replica set (Server 1 Primary, Server 2 Secondary, Server 3 Arbiter) providing **automatic failover within 15-35 seconds** for server-level failures. Primary↔Secondary switchover is achieved through **Hot Sync (oplog-based replication)** within each site, ensuring near real-time data synchronization (~1 minute lag) between Primary and Secondary nodes.
+**Local Site HA (Fully Automatic):** Each site (DC and DR independently) operates a 3-server MongoDB replica set (Server 1 Primary, Server 2 Secondary, Server 3 Arbiter) providing **automatic failover within 20-35 minutes** for server-level failures. Primary↔Secondary data sync is achieved through **Hot Sync (oplog-based replication)** within each site, ensuring near real-time data synchronization (~1 minute lag) between Primary and Secondary nodes.
 
-**Cross-Site DR (Automated Incremental Backup & Restore):** Between DC and DR sites, data synchronization uses **automated cron-based incremental backups** (recommended interval: 30 minutes) transferred via SCP. **Data synchronization runs automatically; only DR site activation requires manual administrator intervention** when the entire DC site fails. There are no automated cross-site failover agents.
+**Cross-Site DR (Automated Incremental Backup & Restore):** Between DC and DR sites, data synchronization uses **automated cron-based incremental backups** (recommended interval: 1 hour, and configurable) transferred via SCP. **Data synchronization runs automatically; only DR site activation requires manual administrator intervention** when the entire DC site fails. There are no automated cross-site failover agents.
 
 **Key Architecture Points:**
 - **Hot Sync (Oplog)**: Used ONLY within each site (DC Primary → DC Secondary; DR Primary → DR Secondary) for local HA
-- **Incremental Backup/Restore**: Used for cross-site synchronization (DC → DR) with 30-minute intervals
-- **RPO**: ~1 minute within each site (Hot Sync); ~30 minutes between DC and DR (Incremental Backup)
+- **Incremental Backup/Restore**: Used for cross-site synchronization (DC → DR) with 1-hour intervals (Configurable)
+- **RPO**: Data sync in ~1 minute within each site (Hot Sync); ~30 minutes between DC and DR (Incremental Backup)
 
 ## Table of Contents
 
