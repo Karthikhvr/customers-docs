@@ -485,10 +485,9 @@ flowchart TD
 ```
 
 **Failover Characteristics:**
-- **Detection Time**: 20 minutes (heartbeat timeout, configurable)
-- **Election Time**: 5-20 seconds (across servers within site, minimal latency)
+- **PRIMARY Fail Detection Time**: 20 minutes (default heartbeat timeout, configurable)
+- **MongoDB Election Time**: 5-20 seconds (across servers within site, minimal latency)
 - **Total Failover**: 20-35 minutes end-to-end
-- **Application Impact**: Brief connection interruption, automatic reconnection
 - **Data Consistency**: Zero data loss with proper write concerns
 
 ---
